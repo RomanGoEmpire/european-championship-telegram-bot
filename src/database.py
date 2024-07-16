@@ -1,6 +1,7 @@
 import requests
 import msgspec
 import json
+from surrealdb import Surreal
 
 from urllib3.exceptions import HeaderParsingError
 from .tournament import Player
