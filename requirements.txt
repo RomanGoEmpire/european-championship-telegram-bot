@@ -1,0 +1,6 @@
+icecream
+requests
+msgspec
+surrealdb
+python-dotenv
+python-telegram-bot
