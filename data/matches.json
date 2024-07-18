@@ -1,0 +1,330 @@
+[
+  {
+    "id": "match:1",
+    "round": "round:1",
+    "next_match_for_winner": "match:17",
+    "next_match_for_looser": "match:25"
+  },
+  {
+    "id": "match:2",
+    "round": "round:1",
+    "next_match_for_winner": "match:17",
+    "next_match_for_looser": "match:25"
+  },
+  {
+    "id": "match:3",
+    "round": "round:1",
+    "next_match_for_winner": "match:18",
+    "next_match_for_looser": "match:26"
+  },
+  {
+    "id": "match:4",
+    "round": "round:1",
+    "next_match_for_winner": "match:18",
+    "next_match_for_looser": "match:26"
+  },
+  {
+    "id": "match:5",
+    "round": "round:1",
+    "next_match_for_winner": "match:19",
+    "next_match_for_looser": "match:27"
+  },
+  {
+    "id": "match:6",
+    "round": "round:1",
+    "next_match_for_winner": "match:19",
+    "next_match_for_looser": "match:27"
+  },
+  {
+    "id": "match:7",
+    "round": "round:1",
+    "next_match_for_winner": "match:20",
+    "next_match_for_looser": "match:28"
+  },
+  {
+    "id": "match:8",
+    "round": "round:1",
+    "next_match_for_winner": "match:20",
+    "next_match_for_looser": "match:28"
+  },
+  {
+    "id": "match:9",
+    "round": "round:1",
+    "next_match_for_winner": "match:21",
+    "next_match_for_looser": "match:29"
+  },
+  {
+    "id": "match:10",
+    "round": "round:1",
+    "next_match_for_winner": "match:21",
+    "next_match_for_looser": "match:29"
+  },
+  {
+    "id": "match:11",
+    "round": "round:1",
+    "next_match_for_winner": "match:22",
+    "next_match_for_looser": "match:30"
+  },
+  {
+    "id": "match:12",
+    "round": "round:1",
+    "next_match_for_winner": "match:22",
+    "next_match_for_looser": "match:30"
+  },
+  {
+    "id": "match:13",
+    "round": "round:1",
+    "next_match_for_winner": "match:23",
+    "next_match_for_looser": "match:31"
+  },
+  {
+    "id": "match:14",
+    "round": "round:1",
+    "next_match_for_winner": "match:23",
+    "next_match_for_looser": "match:31"
+  },
+  {
+    "id": "match:15",
+    "round": "round:1",
+    "next_match_for_winner": "match:24",
+    "next_match_for_looser": "match:32"
+  },
+  {
+    "id": "match:16",
+    "round": "round:1",
+    "next_match_for_winner": "match:24",
+    "next_match_for_looser": "match:32"
+  },
+  {
+    "id": "match:17",
+    "round": "round:2",
+    "next_match_for_winner": "match:33",
+    "next_match_for_looser": "match:41"
+  },
+  {
+    "id": "match:18",
+    "round": "round:2",
+    "next_match_for_winner": "match:33",
+    "next_match_for_looser": "match:42"
+  },
+  {
+    "id": "match:19",
+    "round": "round:2",
+    "next_match_for_winner": "match:34",
+    "next_match_for_looser": "match:43"
+  },
+  {
+    "id": "match:20",
+    "round": "round:2",
+    "next_match_for_winner": "match:34",
+    "next_match_for_looser": "match:44"
+  },
+  {
+    "id": "match:21",
+    "round": "round:2",
+    "next_match_for_winner": "match:35",
+    "next_match_for_looser": "match:37"
+  },
+  {
+    "id": "match:22",
+    "round": "round:2",
+    "next_match_for_winner": "match:35",
+    "next_match_for_looser": "match:38"
+  },
+  {
+    "id": "match:23",
+    "round": "round:2",
+    "next_match_for_winner": "match:36",
+    "next_match_for_looser": "match:39"
+  },
+  {
+    "id": "match:24",
+    "round": "round:2",
+    "next_match_for_winner": "match:36",
+    "next_match_for_looser": "match:40"
+  },
+  {
+    "id": "match:25",
+    "round": "round:2",
+    "next_match_for_winner": "match:37"
+  },
+  {
+    "id": "match:26",
+    "round": "round:2",
+    "next_match_for_winner": "match:38"
+  },
+  {
+    "id": "match:27",
+    "round": "round:2",
+    "next_match_for_winner": "match:39"
+  },
+  {
+    "id": "match:28",
+    "round": "round:2",
+    "next_match_for_winner": "match:40"
+  },
+  {
+    "id": "match:29",
+    "round": "round:2",
+    "next_match_for_winner": "match:41"
+  },
+  {
+    "id": "match:30",
+    "round": "round:2",
+    "next_match_for_winner": "match:42"
+  },
+  {
+    "id": "match:31",
+    "round": "round:2",
+    "next_match_for_winner": "match:43"
+  },
+  {
+    "id": "match:32",
+    "round": "round:2",
+    "next_match_for_winner": "match:44"
+  },
+  {
+    "id": "match:33",
+    "round": "round:3",
+    "next_match_for_winner": "match:53",
+    "next_match_for_looser": "match:52"
+  },
+  {
+    "id": "match:34",
+    "round": "round:3",
+    "next_match_for_winner": "match:54",
+    "next_match_for_looser": "match:51"
+  },
+  {
+    "id": "match:35",
+    "round": "round:3",
+    "next_match_for_winner": "match:55",
+    "next_match_for_looser": "match:50"
+  },
+  {
+    "id": "match:36",
+    "round": "round:3",
+    "next_match_for_winner": "match:56",
+    "next_match_for_looser": "match:49"
+  },
+  {
+    "id": "match:37",
+    "round": "round:3",
+    "next_match_for_winner": "match:45"
+  },
+  {
+    "id": "match:38",
+    "round": "round:3",
+    "next_match_for_winner": "match:45"
+  },
+  {
+    "id": "match:39",
+    "round": "round:3",
+    "next_match_for_winner": "match:46"
+  },
+  {
+    "id": "match:40",
+    "round": "round:3",
+    "next_match_for_winner": "match:46"
+  },
+  {
+    "id": "match:41",
+    "round": "round:3",
+    "next_match_for_winner": "match:47"
+  },
+  {
+    "id": "match:42",
+    "round": "round:3",
+    "next_match_for_winner": "match:47"
+  },
+  {
+    "id": "match:43",
+    "round": "round:3",
+    "next_match_for_winner": "match:48"
+  },
+  {
+    "id": "match:44",
+    "round": "round:3",
+    "next_match_for_winner": "match:48"
+  },
+  {
+    "id": "match:45",
+    "round": "round:4",
+    "next_match_for_winner": "match:49"
+  },
+  {
+    "id": "match:46",
+    "round": "round:4",
+    "next_match_for_winner": "match:50"
+  },
+  {
+    "id": "match:47",
+    "round": "round:4",
+    "next_match_for_winner": "match:51"
+  },
+  {
+    "id": "match:48",
+    "round": "round:4",
+    "next_match_for_winner": "match:52"
+  },
+  {
+    "id": "match:49",
+    "round": "round:5",
+    "next_match_for_winner": "match:54"
+  },
+  {
+    "id": "match:50",
+    "round": "round:5",
+    "next_match_for_winner": "match:53"
+  },
+  {
+    "id": "match:51",
+    "round": "round:5",
+    "next_match_for_winner": "match:56"
+  },
+  {
+    "id": "match:52",
+    "round": "round:5",
+    "next_match_for_winner": "match:55"
+  },
+  {
+    "id": "match:53",
+    "round": "round:6",
+    "next_match_for_winner": "match:57"
+  },
+  {
+    "id": "match:54",
+    "round": "round:6",
+    "next_match_for_winner": "match:57"
+  },
+  {
+    "id": "match:55",
+    "round": "round:6",
+    "next_match_for_winner": "match:58"
+  },
+  {
+    "id": "match:56",
+    "round": "round:6",
+    "next_match_for_winner": "match:58"
+  },
+  {
+    "id": "match:57",
+    "round": "round:7",
+    "next_match_for_winner": "match:59",
+    "next_match_for_looser": "match:60"
+  },
+  {
+    "id": "match:58",
+    "round": "round:7",
+    "next_match_for_winner": "match:59",
+    "next_match_for_looser": "match:60"
+  },
+  {
+    "id": "match:59",
+    "round": "round:8"
+  },
+  {
+    "id": "match:60",
+    "round": "round:8"
+  }
+]

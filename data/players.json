@@ -1,0 +1,226 @@
+[
+  {
+    "elo": 2775,
+    "id": "player:dai_junfu",
+    "name": "Dai Junfu",
+    "rank": "8d",
+    "starting_number": 1
+  },
+  {
+    "elo": 2754,
+    "id": "player:artem_kachanovskyi",
+    "name": "Artem Kachanovskyi",
+    "rank": "2p",
+    "starting_number": 2
+  },
+  {
+    "elo": 2753,
+    "id": "player:mateusz_surma",
+    "name": "Mateusz Surma",
+    "rank": "3p",
+    "starting_number": 3
+  },
+  {
+    "elo": 2722,
+    "id": "player:andrii_kravets",
+    "name": "Andrii Kravets",
+    "rank": "1p",
+    "starting_number": 4
+  },
+  {
+    "elo": 2718,
+    "id": "player:stanislaw_frejlak",
+    "name": "Stanislaw Frejlak",
+    "rank": "1p",
+    "starting_number": 5
+  },
+  {
+    "elo": 2702,
+    "id": "player:lukas_podpera",
+    "name": "Lukas Podpera",
+    "rank": "7d",
+    "starting_number": 6
+  },
+  {
+    "elo": 2693,
+    "id": "player:ali_jabarin",
+    "name": "Ali Jabarin",
+    "rank": "2p",
+    "starting_number": 7
+  },
+  {
+    "elo": 2687,
+    "id": "player:benjamin_drean_guenaizia",
+    "name": "Benjamin Drean-Guenaizia",
+    "rank": "7d",
+    "starting_number": 8
+  },
+  {
+    "elo": 2680,
+    "id": "player:fredrik_blomback",
+    "name": "Fredrik Blomback",
+    "rank": "7d",
+    "starting_number": 9
+  },
+  {
+    "elo": 2676,
+    "id": "player:rob_van_zeist",
+    "name": "Rob van Zeist",
+    "rank": "7d",
+    "starting_number": 10
+  },
+  {
+    "elo": 2670,
+    "id": "player:tanguy_lecalve",
+    "name": "Tanguy LeCalve",
+    "rank": "1p",
+    "starting_number": 11
+  },
+  {
+    "elo": 2667,
+    "id": "player:thomas_debarre",
+    "name": "Thomas Debarre",
+    "rank": "7d",
+    "starting_number": 12
+  },
+  {
+    "elo": 2665,
+    "id": "player:ashe_vazquez",
+    "name": "Ashe Vazquez",
+    "rank": "7d",
+    "starting_number": 13
+  },
+  {
+    "elo": 2635,
+    "id": "player:jonas_welticke",
+    "name": "Jonas Welticke",
+    "rank": "6d",
+    "starting_number": 14
+  },
+  {
+    "elo": 2618,
+    "id": "player:dominik_boviz",
+    "name": "Dominik Boviz",
+    "rank": "6d",
+    "starting_number": 15
+  },
+  {
+    "elo": 2605,
+    "id": "player:lukas_kraemer",
+    "name": "Lukas Kraemer",
+    "rank": "6d",
+    "starting_number": 16
+  },
+  {
+    "elo": 2603,
+    "id": "player:remi_campagnie",
+    "name": "Remi Campagnie",
+    "rank": "6d",
+    "starting_number": 17
+  },
+  {
+    "elo": 2576,
+    "id": "player:cornel_burzo",
+    "name": "Cornel Burzo",
+    "rank": "6d",
+    "starting_number": 18
+  },
+  {
+    "elo": 2574,
+    "id": "player:matias_pankoke",
+    "name": "Matias Pankoke",
+    "rank": "6d",
+    "starting_number": 19
+  },
+  {
+    "elo": 2573,
+    "id": "player:ho_yeung_woo",
+    "name": "Ho Yeung Woo",
+    "rank": "6d",
+    "starting_number": 20
+  },
+  {
+    "elo": 2571,
+    "id": "player:bohdan_zhurakovskyi",
+    "name": "Bohdan Zhurakovskyi",
+    "rank": "5d",
+    "starting_number": 21
+  },
+  {
+    "elo": 2565,
+    "id": "player:lucas_neirynck",
+    "name": "Lucas Neirynck",
+    "rank": "6d",
+    "starting_number": 22
+  },
+  {
+    "elo": 2564,
+    "id": "player:davide_bernardis",
+    "name": "Davide Bernardis",
+    "rank": "6d",
+    "starting_number": 23
+  },
+  {
+    "elo": 2553,
+    "id": "player:denis_dobranis",
+    "name": "Denis Dobranis",
+    "rank": "6d",
+    "starting_number": 24
+  },
+  {
+    "elo": 2551,
+    "id": "player:denis_karadaban",
+    "name": "Denis Karadaban",
+    "rank": "6d",
+    "starting_number": 25
+  },
+  {
+    "elo": 2551,
+    "id": "player:vsevolod_ovsiienko",
+    "name": "Vsevolod Ovsiienko",
+    "rank": "6d",
+    "starting_number": 26
+  },
+  {
+    "elo": 2543,
+    "id": "player:dmytro_bohatsky",
+    "name": "Dmytro Bohatsky",
+    "rank": "6d",
+    "starting_number": 27
+  },
+  {
+    "elo": 2539,
+    "id": "player:florent_labouret",
+    "name": "Florent Labouret",
+    "rank": "6d",
+    "starting_number": 28
+  },
+  {
+    "elo": 2529,
+    "id": "player:lothar_spiegel",
+    "name": "Lothar Spiegel",
+    "rank": "5d",
+    "starting_number": 29
+  },
+  {
+    "elo": 2523,
+    "id": "player:yuze_xing",
+    "name": "Yuze Xing",
+    "rank": "5d",
+    "starting_number": 30
+  },
+  {
+    "elo": 2442,
+    "id": "player:linh_vu_tu",
+    "name": "Linh Vu Tu",
+    "rank": "5d",
+    "starting_number": 31
+  },
+  {
+    "elo": 2272,
+    "id": "player:benoit_robichon",
+    "name": "Benoît Robichon",
+    "rank": "3d",
+    "starting_number": 32
+  }
+]

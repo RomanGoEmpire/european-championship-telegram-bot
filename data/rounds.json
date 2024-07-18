@@ -1,0 +1,42 @@
+[
+  {
+    "id": "round:1",
+    "name": "Round 1",
+    "deadline": "2024-07-28T10:00:00Z"
+  },
+  {
+    "id": "round:2",
+    "name": "Round 2",
+    "deadline": "2024-07-29T10:00:00Z"
+  },
+  {
+    "id": "round:3",
+    "name": "Round 3",
+    "deadline": "2024-07-30T10:00:00Z"
+  },
+  {
+    "id": "round:4",
+    "name": "Round 4",
+    "deadline": "2024-07-31T10:00:00Z"
+  },
+  {
+    "id": "round:5",
+    "name": "Round 5",
+    "deadline": "2024-08-01T10:00:00Z"
+  },
+  {
+    "id": "round:6",
+    "name": "Quarter-Finals",
+    "deadline": "2024-08-02T10:00:00Z"
+  },
+  {
+    "id": "round:7",
+    "name": "Round Semi-Finals",
+    "deadline": "2024-08-03T10:00:00Z"
+  },
+  {
+    "id": "round:8",
+    "name": "Final",
+    "deadline": "2024-08-04T10:00:00Z"
+  }
+]
