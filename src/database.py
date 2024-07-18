@@ -76,6 +76,7 @@ async def add_message(id: int, data: dict) -> None:
 
 async def add_gambler(id: int, username: str) -> None:
     await connect()
-
-    await db.create(f"gambler:{id}", data={"username": username})
+    gambler = await db.select(f"gambler:{id}")
+    if len(gambler) == 0:
+        await db.create(f"gambler:{id}", data={"username": username})
     await db.close()
