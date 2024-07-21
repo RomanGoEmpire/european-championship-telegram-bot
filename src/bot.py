@@ -17,14 +17,13 @@ from telegram.ext import (
     ConversationHandler,
 )
 
+load_dotenv()
+
 
 # - - - - - DB - - - - -
 
 DB = Surreal("ws://localhost:8000/rpc")
 ADMIN_ID = os.getenv("admin_id")
-
-GAME, WINNER, AMOUNT = range(3)
-REMOVE_BET = 3
 
 
 async def connect():
@@ -33,18 +32,51 @@ async def connect():
     await DB.use("test", "test")
 
 
-async def add_message(user_id: int, message_id: int, data: dict) -> None:
-    await connect()
-    await DB.create(f"message:{message_id}", data)
-    await DB.query(f"RELATE gambler:{user_id}->wrote->message:{message_id}")
-    await DB.close()
-
-
 # - - - - - Telegram Bot - - - - -
+
+GAME, WINNER, AMOUNT = range(3)
+REMOVE_BET = range(1)
+CHANGE_NAME = range(1)
+
+START_TEXT = """
+Get ready to place your bets and follow the exciting battles of the European Go Championship!
+
+*Format*
+- Each player starts with 1,000 points.
+- Place your bets on players with /bet.
+- Player that guessed the winners will receive a payout. Check out /me to see your balance and bets.
+
+🏆 The best participants will receive a prize after the finals.
+
+❗ To change the name that will be displayed on the leaderboard, use the command /setname name.
+
+ℹ️ To learn more about the available commands and features, start by typing /help.
+
+Let's get started! 🚀
+"""
+
+HELP_TEXT = """
+💬 *Change Name*
+/changename _newname_ - Change your Name (Default is your Telegram name)
+
+🔍 *Account Information*
+/me - View your name,current balance, active bets and betting history
+
+🏆 *Leaderboard*
+/leaderboard - View the current leaderboard of all players
+
+🎲 *Match Information*
+/info - Retrieve detailed information about a match
+
+🎯 *Place a Bet*
+/bet - Place a bet
+
+❌ *Remove a Bet*
+/remove - Remove a bet
+"""
 
 
 def init_bot():
-    load_dotenv()
     TOKEN = os.getenv("TOKEN")
     assert TOKEN and TOKEN != "", "Token missing"
 
@@ -52,32 +84,34 @@ def init_bot():
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help))
-    application.add_handler(CommandHandler("profile", profile))
-    application.add_handler(CommandHandler("setname", setname))
+    application.add_handler(CommandHandler("me", me))
+    application.add_handler(CommandHandler("changename", changename))
     application.add_handler(CommandHandler("leaderboard", leaderboard))
-    application.add_handler(CommandHandler("matches", matches))
-    application.add_handler(CommandHandler("match", match))
+    application.add_handler(CommandHandler("info", info))
 
+    change_name_handler = ConversationHandler(
+        entry_points=[CommandHandler("chagename", changename)],
+        states={CHANGE_NAME: [MessageHandler(filters.TEXT, update_name)]},
+        fallbacks=[],
+        name="change_name",
+    )
     bet_handler = ConversationHandler(
-        entry_points=[CommandHandler("bet", bet)],  # choose a game
+        entry_points=[CommandHandler("bet", bet)],
         states={
-            GAME: [MessageHandler(filters.TEXT, game)],  # choose a winner
-            WINNER: [MessageHandler(filters=None, callback=winner)],  # choose an amount
+            GAME: [MessageHandler(filters.TEXT, game)],
+            WINNER: [MessageHandler(filters=None, callback=winner)],
             AMOUNT: [MessageHandler(None, set_bet)],
         },
         fallbacks=[],
         name="bet_handler",
     )
     remove_handler = ConversationHandler(
-        entry_points=[CommandHandler("remove", remove)],  # choose game
-        states={
-            REMOVE_BET: [
-                MessageHandler(filters.TEXT, display_remove)
-            ],  # Display remove
-        },
+        entry_points=[CommandHandler("remove", remove)],
+        states={REMOVE_BET: [MessageHandler(filters.TEXT, display_remove)]},
         fallbacks=[],
         name="bet_handler",
     )
+    application.add_handler(change_name_handler)
     application.add_handler(bet_handler)
     application.add_handler(remove_handler)
 
@@ -87,64 +121,27 @@ def init_bot():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await add_message(update._effective_user.id, update.update_id, update.to_dict())
     await connect()
-    gambler = await DB.select(f"gambler:{update.effective_user.id}")
+
+    user_id = update.effective_user.id
+    gambler = await DB.select(f"gambler:{user_id}")
     if not gambler:
+        username = update.effective_user.username
+        chat_id = update.message.chat_id
+
         await DB.create(
-            f"gambler:{update.effective_user.id}",
-            data={"name": update.effective_user.username},
+            f"gambler:{user_id}",
+            data={"name": username, "username": username, "chat_id": chat_id},
         )
     await DB.close()
-
-    start_text = """Get ready to place your bets and follow the exciting battles of the European Go Championship!
-
-🏆 The top three players with the highest points after the finals will receive a prize.
-
-*Format:*
-- Each player starts with 1,000 points.
-- Place your bets on your favorite players with /bet.
-
-❗ To change the name that will be displayed on the leaderboard, use the command /setname name.
-
-ℹ️ To learn more about the available commands and features, start by typing /help.
-
-Let's get started, and may the best player win! 🚀
-"""
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id, text=start_text, parse_mode="markdown"
-    )
+    await update.message.reply_text(START_TEXT, parse_mode="markdown")
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = """
-🔍 *Profile*
-/profile - View your current balance, pending bets and betting history
-
-💬 *Change Name*
-/setname _newname_ - Set your Name (Default is your Telegram name)
-
-🏆 *Leaderboard*
-/leaderboard - View the current leaderboard of all players
-
-🥊 *Open Matches*
-/matches - List all matches that are currently open for betting
-
-🎲 *Match Information*
-/match _matchnumber_ - Retrieve detailed information about a match
-
-🎯 *Place a Bet*
-/bet _matchnumber_ _player_ _points_ - Place a bet on a player in a match
-
-❌ *Remove a Bet*
-/removebet _matchnumber_ - Cancel a bet on a match
-"""
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id, text=help_text, parse_mode="markdown"
-    )
+    await update.message.reply_text(HELP_TEXT,parse_mode="markdown"
 
 
-async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await connect()
     gambler = await DB.select(f"gambler:{update.effective_user.id}")
     await DB.close()
@@ -167,7 +164,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def changename(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
