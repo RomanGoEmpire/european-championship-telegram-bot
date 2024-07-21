@@ -6,15 +6,6 @@ from surrealdb import Surreal
 from .formulars import win_percentages
 
 
-db = Surreal("ws://localhost:8000/rpc")
-
-
-async def connect():
-    await db.connect()
-    await db.signin({"user": "root", "pass": "root"})
-    await db.use("test", "test")
-
-
 async def add_tables_from_json() -> None:
     players = json.load(open("data/players.json"))
     matches = json.load(open("data/matches.json"))
@@ -60,7 +51,6 @@ async def add_all_odds() -> None:
 
 async def add_odds_to_match(match_id: str) -> None:
     match = await db.query(f"select <-plays<-player.elo as elo from {match_id}")
-    match = match[0]["result"]
     assert len(match["elo"]) == 2, ("Calculating odds failed. Not 2 players", match_id)
 
     r1, r2 = match["elo"]
@@ -68,15 +58,8 @@ async def add_odds_to_match(match_id: str) -> None:
     await db.query(f"UPDATE {match_id} set odds={[p1,p2]}")
 
 
-async def add_message(id: int, data: dict) -> None:
+async def get_all_gamblers() -> list[dict]:
     await connect()
-    await db.create(f"message:{id}", data)
+    gamblers = await db.query(f"SELECT * FROM gambler ORDER BY budget DESC")
     await db.close()
-
-
-async def add_gambler(id: int, username: str) -> None:
-    await connect()
-    gambler = await db.select(f"gambler:{id}")
-    if len(gambler) == 0:
-        await db.create(f"gambler:{id}", data={"username": username})
-    await db.close()
+    return gamblers[0]["result"]
