@@ -17,8 +17,6 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-load_dotenv()
-
 
 # - - - - - DB - - - - -
 
@@ -30,6 +28,50 @@ async def connect():
     await DB.connect()
     await DB.signin({"user": "root", "pass": "root"})
     await DB.use("test", "test")
+
+
+async def get_gambler(id: int):
+    await connect()
+    gambler = await DB.select(f"gambler:{id}")
+    await DB.close()
+    return gambler
+
+
+async def get_active_matches() -> list:
+    await connect()
+    active_games = await DB.query(
+        "SELECT *,<-plays<-player.* as players,round.* FROM match WHERE round.active"
+    )
+    await DB.close()
+    return active_games[0]["result"]
+
+
+async def get_payout(match_id):
+    await connect()
+    bets = await DB.query(
+        f"SELECT *,out.odds as odds,out<-plays<-player.* AS players FROM bets WHERE out=={match_id}"
+    )
+    bets = bets[0]["result"]
+    if not bets:
+        match = await DB.select(match_id)
+        await DB.close()
+        odds = match["odds"]
+        return (round(1 + odds[1] / odds[0], 1), round(1 + odds[0] / odds[1], 1))
+    await DB.close()
+    players = bets[0]["players"]
+    odds = bets[0]["odds"]
+    player_amounts = [
+        sum(bet["amount"] for bet in bets if bet["winner"] == players[0]["id"]),
+        sum(bet["amount"] for bet in bets if bet["winner"] == players[1]["id"]),
+    ]
+
+    if 0 in player_amounts:
+        return (round(1 + odds[1] / odds[0], 1), round(1 + odds[0] / odds[1], 1))
+    else:
+        return (
+            round(1 + player_amounts[1] / player_amounts[0], 1),
+            round(1 + player_amounts[0] / player_amounts[1], 1),
+        )
 
 
 # - - - - - Telegram Bot - - - - -
@@ -66,7 +108,7 @@ HELP_TEXT = """
 /leaderboard - View the current leaderboard of all players
 
 🎲 *Match Information*
-/info - Retrieve detailed information about a match
+/info - Retrieve detailed information about the matches
 
 🎯 *Place a Bet*
 /bet - Place a bet
@@ -75,8 +117,28 @@ HELP_TEXT = """
 /remove - Remove a bet
 """
 
+ME_TEXT = """
+🔍 *Profile*
+
+Name: {name}
+Balance: {balance}
+
+*Active bets:*
+{active_bets}
+"""
+
+INFO_TEXT = """
+🎲 *Match Information for {round_name}*
+
+*🥊 Matches*
+{matches}
+
+{time_left}
+"""
+
 
 def init_bot():
+    load_dotenv()
     TOKEN = os.getenv("TOKEN")
     assert TOKEN and TOKEN != "", "Token missing"
 
@@ -89,12 +151,6 @@ def init_bot():
     application.add_handler(CommandHandler("leaderboard", leaderboard))
     application.add_handler(CommandHandler("info", info))
 
-    change_name_handler = ConversationHandler(
-        entry_points=[CommandHandler("chagename", changename)],
-        states={CHANGE_NAME: [MessageHandler(filters.TEXT, update_name)]},
-        fallbacks=[],
-        name="change_name",
-    )
     bet_handler = ConversationHandler(
         entry_points=[CommandHandler("bet", bet)],
         states={
@@ -111,7 +167,6 @@ def init_bot():
         fallbacks=[],
         name="bet_handler",
     )
-    application.add_handler(change_name_handler)
     application.add_handler(bet_handler)
     application.add_handler(remove_handler)
 
@@ -121,46 +176,48 @@ def init_bot():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await connect()
 
-    user_id = update.effective_user.id
-    gambler = await DB.select(f"gambler:{user_id}")
+    id = update.effective_user.id
+    gambler = await get_gambler(id)
     if not gambler:
+        await connect()
         username = update.effective_user.username
         chat_id = update.message.chat_id
 
         await DB.create(
-            f"gambler:{user_id}",
+            f"gambler:{id}",
             data={"name": username, "username": username, "chat_id": chat_id},
         )
-    await DB.close()
+        await DB.close()
     await update.message.reply_text(START_TEXT, parse_mode="markdown")
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(HELP_TEXT,parse_mode="markdown"
+    await update.message.reply_text(HELP_TEXT, parse_mode="markdown")
 
 
 async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    gambler = await get_gambler(update.effective_user.id)
+    assert type(gambler) == dict, "gambler is not a dict"
+
     await connect()
-    gambler = await DB.select(f"gambler:{update.effective_user.id}")
-    await DB.close()
-
-    active_bets = None
-    previous_bets = None
-
-    profile_text = f"""
-*Name:* {gambler["name"]}
-*Balance:* {gambler["balance"]}
-
-*Active Bets:*
-{active_bets}
-
-*Previous Bets:*
-{previous_bets}
-"""
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id, text=profile_text, parse_mode="markdown"
+    active_bets = await DB.query(
+        f"SELECT *,winner.name as winner,out<-plays<-player.* as players,out.winner as actual_winner FROM bets where in=={gambler["id"]}"
+    )
+    active_bets = active_bets[0]["result"]
+    active_bets_text = "\n".join(
+        [
+            f"{bet["players"][0]["name"]} vs {bet["players"][1]["name"]}\nPlace {bet["amount"]} on {bet["winner"]}\n"
+            for bet in active_bets
+        ]
+    )
+    await update.message.reply_text(
+        ME_TEXT.format(
+            name=gambler["name"],
+            balance=gambler["balance"],
+            active_bets=active_bets_text,
+        ),
+        parse_mode="markdown",
     )
 
 
@@ -168,7 +225,7 @@ async def changename(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Please provide a name.\nExample: /setname MyName",
+            text="❌ Please provide a name.\nExample: /changename NewName",
             parse_mode="markdown",
         )
         return
@@ -187,6 +244,7 @@ async def changename(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await connect()
     gamblers = await DB.select("gambler")
+    gamblers.sort(key=lambda gambler: gambler["balance"], reverse=True)
     await DB.close()
 
     leaderboard_text = "🏆 *Leaderboard*\n\n"
@@ -195,125 +253,54 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if gambler["id"] == f"gambler:{update.effective_user.id}":
             leaderboard_position = index + 1
         if index == 0:
-            leaderboard_text += "*Top 3*\n"
             leaderboard_text += "🥇 "
         elif index == 1:
             leaderboard_text += "🥈 "
         elif index == 2:
             leaderboard_text += "🥉 "
         else:
-            if index == 3:
-                leaderboard_text += "\n*Top 100*\n"
-            if index == 99:
-                leaderboard_text += "\n*Placement above 100*\n"
             leaderboard_text += f"{index + 1}: "
         leaderboard_text += f"{gambler["name"]} - {gambler["balance"]}\n"
-    leaderboard_text += f"\n\nYou are *{leaderboard_position}* with *{gamblers[leaderboard_position -1]["balance"]}* points"
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id, text=leaderboard_text, parse_mode="markdown"
-    )
+    leaderboard_text += f"\n\nYou are *{leaderboard_position}.* with *{gamblers[leaderboard_position -1]["balance"]}* points"
+    await update.message.reply_text(leaderboard_text, parse_mode="markdown")
 
 
-async def matches(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await connect()
-    matches = await DB.query(
-        "SELECT *,round.*,<-plays.in.* as players FROM match where round.active"
-    )
-    await DB.close()
-    matches = matches[0]["result"]
-    matches_text = "🥊 *Open Matches*\n ℹ️ These games are open for betting.\n\n"
-    for match in matches:
-        player1_name = match["players"][0]["name"]
-        player1_rank = match["players"][0]["rank"]
-        player2_name = match["players"][1]["name"]
-        player2_rank = match["players"][1]["rank"]
-        matches_text += f"""*Match: {match["id"].split(":")[-1]}*
-    {player1_name} {player1_rank} vs.
-    {player2_name} {player2_rank}
+async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def convert_seconds(seconds):
+        seconds = int(seconds)
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        seconds = seconds % 60
+        return f"{hours}:{minutes}:{seconds}"
 
-"""
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id, text=matches_text, parse_mode="markdown"
-    )
+    active_matches = await get_active_matches()
+    round_name = active_matches[0]["round"]["name"]
+    deadline = convert_string_to_datetime(active_matches[0]["round"]["deadline"])
+    payouts = [await get_payout(match["id"]) for match in active_matches]
+    time_left = (deadline - datetime.datetime.now()).total_seconds()
 
-
-async def match(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args or not context.args[0].isdigit():
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Please provide a match number.\nExample: /match 1",
-        )
-        return
-
-    match_id = int(context.args[0])
-
-    if not valid_match_id(match_id):
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"Match {match_id} does not exist.\nUse /matches to get a list of valid matches.",
-        )
-        return
-
-    await connect()
-    match = await DB.query(
-        f"SELECT *,round.*,<-plays<-player.* as players,<-bets.* as bets,winner.name as winner FROM match:{match_id}"
-    )
-    match = match[0]["result"][0]
-
-    if len(match["players"]) != 2:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"Match {match_id} does not have two players yet.\nUse /matches to get a list of valid matches.",
-        )
-        return
-
-    player1, player2 = match["players"]
-
-    payout1 = sum(
-        [bet["amount"] for bet in match["bets"] if bet["player"] == player1["id"]]
-    )
-    payout2 = sum(
-        [bet["amount"] for bet in match["bets"] if bet["player"] == player2["id"]]
-    )
-
-    odds = match["odds"]
-    if payout1 == 0 or payout2 == 0:
-        current_payout = (
-            f"{1 + round(odds[1]/odds[0],2)} : {1 + round(odds[0]/odds[1],2)}"
-        )
+    if time_left < 0:
+        time_left_text = "🔒 Bets are closed for this round"
     else:
-        current_payout = (
-            f"{1 + round(payout2/payout1,2)} : {1 + round(payout1/payout2,2)}"
-        )
+        time_left_text = f"⏰ Time left: {convert_seconds(time_left)}"
 
-    winner = f"Winner: {match["winner"]}" if match["winner"] else ""
+    matches = "\n".join(
+        [
+            f"""*Match {match["id"].split(":")[-1]}*
+    {match["players"][0]["name"]} {match["players"][0]["rank"]} ({match["players"][0]["elo"]}) vs
+    {match["players"][1]["name"]} {match["players"][1]["rank"]} ({match["players"][1]["elo"]})
 
-    time_left = (
-        convert_string_to_datetime(match["round"]["deadline"]) - datetime.datetime.now()
+    Odds: {match["odds"][0] * 100:.2f}% , {match["odds"][1] * 100:.2f}%
+    Current Payout: {payouts[index][0]} : {payouts[index][1]}
+    """
+            for index, match in enumerate(active_matches)
+        ]
     )
-    if time_left.total_seconds() > 0:
-        closing_time = f"Bet closes in: {(time_left.total_seconds() - time_left.seconds)// 3600 } hours {(time_left.seconds // 60) % 60} minutes"
-    else:
-        closing_time = "Bets are closed for this round."
 
-    match_text = f"""🎲 *Match Information*
-Match: {match_id}
-{match["round"]["name"]}
-
-Players:
-    {player1["name"]} {player1["rank"]} ({player1["elo"]}) vs.
-    {player2["name"]} {player2["rank"]} ({player2["elo"]})
-
-Odds: {odds[0] * 100:.2f}% , {odds[1] * 100:.2f}%
-Current payout: {current_payout}
-
-{winner}
-
-{closing_time}
-"""
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=match_text,
+    await update.message.reply_text(
+        INFO_TEXT.format(
+            round_name=round_name, matches=matches, time_left=time_left_text
+        ),
         parse_mode="markdown",
     )
 
@@ -341,6 +328,9 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if " vs " not in update.message.text:
+        await update.message.reply_text("Please try again.")
+        return ConversationHandler.END
     player1_name, player2_name = update.message.text.split(" vs ")
     context.user_data["match"] = [
         match
@@ -418,7 +408,7 @@ async def set_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return AMOUNT
     bet_amount = int(bet_amount)
-    if bet_amount < 0 or bet_amount > gambler["balance"]:
+    if bet_amount <= 0 or bet_amount > gambler["balance"]:
         await update.message.reply_text(
             f"Please enter a number between 0 and {gambler["balance"]}"
         )
@@ -527,7 +517,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await add_message(update._effective_user.id, update.update_id, update.to_dict())
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=f"An error occurred. Please try again. The admin has been notified and will work to resolve the problem.",
