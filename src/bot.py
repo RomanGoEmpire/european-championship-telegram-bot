@@ -22,6 +22,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ConversationHandler,
 )
+from .formulars import win_percentages
 
 
 # - - - - - DB - - - - -
@@ -109,6 +110,7 @@ Get ready to place your bets and follow the exciting battles of the European Go 
 
 *Format*
 - Each player starts with 1,000 points.
+- After each round each player will receive 50 points.
 - Place your bets on players with /bet.
 - Player that guessed the winners will receive a payout. Check out /me to see your balance and bets.
 
@@ -241,10 +243,8 @@ def init_bot():
     application.add_handler(CommandHandler("leaderboard", leaderboard))
     application.add_handler(CommandHandler("info", info))
 
-    # admin commands
-
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
-    # application.add_error_handler(error)
+    application.add_error_handler(error)
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
@@ -703,11 +703,11 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payout = payouts[index_payout]
 
     await connect()
+
     for bet in bets:
         if bet["winner"] == winner_id:
             message = CORRECT_GUESS
-
-            amount_difference = bet["amount"] * payout
+            amount_difference = round(bet["amount"] * payout)
             await DB.query(f"UPDATE {bet["in"]} SET balance+={amount_difference}")
 
         else:
@@ -734,20 +734,49 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     ongoing_matches = ongoing_matches[0]["result"]
 
-    if ongoing_matches:
+    if not ongoing_matches:
         active_round = await DB.query("select * from round where active")
         active_round = active_round[0]["result"][0]
 
         await DB.query(f"UPDATE {active_round["id"]} set active=False")
-        await DB.query(
-            f"UPDATE round:{int(active_round["id"].split(":")[-1]) + 1} set active=True"
-        )
+        round_number = int(active_round["id"].split(":")[-1])
+        if round_number != 8:
+            await DB.query(f"UPDATE round:{round_number + 1} set active=True")
+
+        await add_odds()
 
         gamblers = await DB.select("gambler")
+
+        if active_round["id"] != "round:8":
+            end_of_round_text = f"""
+            🌟 {active_round["name"]} has ended!
+
+            You received 50 points.
+
+            The bets are now open for the next round.
+            Use /bet to start placing bets, or check your new balance with the /me.
+            Good luck to everyone in the next round!
+            """
+        else:
+            winner = await DB.query("SELECT *,winner.* as winner FROM match:59")
+            winner = winner[0]["result"][0]
+            end_of_round_text = f"""
+            🌟 The European Championship 2024 has concluded!
+
+            After eight thrilling days of competition, we bid farewell to this year's European Go Championship.
+            We extend our gratitude to all the participants for their involvement in this exhilarating event.
+
+            Congratulations to our champion, {winner["winner"]["name"]}, who emerged victorious in the final match!
+
+            🏆 Please check out /leaderboard to see your final placement.
+
+            We hope you enjoyed this exciting competition. Have a wonderful second week of EGC!
+            """
+
         for gambler in gamblers:
+            await DB.query(f"UPDATE {gambler["id"]} SET balance+=50")
             await context.bot.send_message(
-                chat_id=gambler["chat_id"],
-                text=f"🌟 {active_round["name"]} has ended!\n\nThe bets are now open for the next round. Use the /bet command to start placing bets, or check your new Balance with the /me command. Good luck to everyone!",
+                chat_id=gambler["chat_id"], text=end_of_round_text
             )
 
     await DB.close()
@@ -790,3 +819,17 @@ def is_admin(user_id: int) -> bool:
 
 def convert_string_to_datetime(date_string) -> datetime.datetime:
     return datetime.datetime.fromisoformat(date_string).replace(tzinfo=None)
+
+
+async def add_odds() -> None:
+    await connect()
+    matches = await DB.query(
+        "select *,<-plays<-player.elo as elo, <-plays<-player.name as name from match where round.active"
+    )
+    matches = list(filter(lambda x: len(x["elo"]) > 0, matches[0]["result"]))
+
+    for match in matches:
+        r1, r2 = match["elo"]
+        p1, p2 = win_percentages(r1, r2)
+        await DB.query(f"UPDATE {match["id"]} set odds={[p1,p2]}")
+    await DB.close()
