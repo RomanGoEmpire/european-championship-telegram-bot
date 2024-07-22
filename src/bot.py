@@ -6,7 +6,13 @@ import telegram
 from icecream import ic
 from dotenv import load_dotenv
 from surrealdb import Surreal
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -21,7 +27,7 @@ from telegram.ext import (
 # - - - - - DB - - - - -
 
 DB = Surreal("ws://localhost:8000/rpc")
-ADMIN_ID = os.getenv("admin_id")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 
 async def connect():
@@ -35,6 +41,19 @@ async def get_gambler(id: int):
     gambler = await DB.select(f"gambler:{id}")
     await DB.close()
     return gambler
+
+
+async def add_message(user_id: int, update_id: int, update: Update):
+    await connect()
+    await DB.create(
+        "message",
+        data={
+            "gambler": f"gambler:{user_id}",
+            "chat_id": update_id,
+            "data": str(update),
+        },
+    )
+    await DB.close()
 
 
 async def get_active_matches() -> list:
@@ -144,31 +163,38 @@ def init_bot():
 
     application = ApplicationBuilder().token(TOKEN).build()
 
+    bet_handler = ConversationHandler(
+        entry_points=[CommandHandler("bet", bet)],
+        states={
+            GAME: [
+                CallbackQueryHandler(game, pattern="^match"),
+            ],
+            WINNER: [
+                CallbackQueryHandler(winner, pattern="^player"),
+            ],
+            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_bet)],
+        },
+        fallbacks=[
+            CallbackQueryHandler(stop_bet_button, pattern="^stop"),
+            MessageHandler(filters.TEXT | filters.COMMAND, stop_bet),
+        ],
+        name="bet_handler",
+        per_user=False,
+    )
+    remove_handler = ConversationHandler(
+        entry_points=[CommandHandler("remove", remove)],
+        states={REMOVE_BET: [CallbackQueryHandler(display_remove, pattern="^bets")]},
+        fallbacks=[CallbackQueryHandler(stop_remove, pattern="^stop_remove")],
+        name="bet_handler",
+    )
+    application.add_handler(bet_handler)
+    application.add_handler(remove_handler)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help))
     application.add_handler(CommandHandler("me", me))
     application.add_handler(CommandHandler("changename", changename))
     application.add_handler(CommandHandler("leaderboard", leaderboard))
     application.add_handler(CommandHandler("info", info))
-
-    bet_handler = ConversationHandler(
-        entry_points=[CommandHandler("bet", bet)],
-        states={
-            GAME: [MessageHandler(filters.TEXT, game)],
-            WINNER: [MessageHandler(filters=None, callback=winner)],
-            AMOUNT: [MessageHandler(None, set_bet)],
-        },
-        fallbacks=[],
-        name="bet_handler",
-    )
-    remove_handler = ConversationHandler(
-        entry_points=[CommandHandler("remove", remove)],
-        states={REMOVE_BET: [MessageHandler(filters.TEXT, display_remove)]},
-        fallbacks=[],
-        name="bet_handler",
-    )
-    application.add_handler(bet_handler)
-    application.add_handler(remove_handler)
 
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
     application.add_error_handler(error)
@@ -207,7 +233,7 @@ async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
     active_bets = active_bets[0]["result"]
     active_bets_text = "\n".join(
         [
-            f"{bet["players"][0]["name"]} vs {bet["players"][1]["name"]}\nPlace {bet["amount"]} on {bet["winner"]}\n"
+            f"{bet["players"][0]["name"]} vs {bet["players"][1]["name"]}\n🎯 Place {bet["amount"]} on {bet["winner"]}\n"
             for bet in active_bets
         ]
     )
@@ -311,16 +337,19 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"SELECT *,round.*,<-plays.in.* as players FROM match where round.active"
     )
     matches = matches[0]["result"]
-    keyboard = ReplyKeyboardMarkup(
+
+    buttons = [
         [
-            [
-                f"{match["players"][0]["name"]} vs {match["players"][1]["name"]}",
-            ]
-            for match in matches
-        ],
-        one_time_keyboard=True,
-    )
-    context.user_data["matches"] = matches
+            InlineKeyboardButton(
+                text=f"{match["players"][0]["name"]} vs {match["players"][1]["name"]}",
+                callback_data=match["id"],
+            )
+        ]
+        for match in matches
+    ]
+    buttons.append([InlineKeyboardButton(text="Stop", callback_data="stop")])
+    keyboard = InlineKeyboardMarkup(buttons)
+
     await update.message.reply_text(
         "Choose a game to place your bet", reply_markup=keyboard
     )
@@ -328,109 +357,128 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if " vs " not in update.message.text:
-        await update.message.reply_text("Please try again.")
-        return ConversationHandler.END
-    player1_name, player2_name = update.message.text.split(" vs ")
-    context.user_data["match"] = [
-        match
-        for match in context.user_data["matches"]
-        if all(
-            player["name"] in [player1_name, player2_name]
-            for player in match["players"]
-        )
-    ][0]
-    del context.user_data["matches"]
+    match_id = update.callback_query.data
+    context.user_data["match_id"] = match_id
 
     existing_bet = await DB.query(
-        f"select * from bets where in == gambler:{update.effective_user.id} and out=={context.user_data["match"]["id"]}"
+        f"SELECT *,winner.name as winner from bets where in == gambler:{update.effective_user.id} and out=={match_id}"
     )
     existing_bet = existing_bet[0]["result"]
 
-    actions = [[player1_name, player2_name]]
+    await connect()
     if existing_bet:
-        context.user_data["existing_bet"] = existing_bet[0]
-
-        actions.append(["Stop"])
-        await update.message.reply_text(
-            "ℹ️There is already a bet. You can override it by continuing or stopping it."
+        await DB.delete(existing_bet[0]["id"])
+        await DB.query(
+            f"UPDATE gambler:{update.effective_user.id} SET balance+={existing_bet[0]["amount"]}"
         )
+        context.user_data["existing_bet"] = existing_bet
+    match = await DB.query(f"SELECT *,round.*,<-plays.in.* as players FROM {match_id}")
+    match = match[0]["result"][0]
+    payout = await get_payout(match["id"])
 
-    keyboard = ReplyKeyboardMarkup(
-        actions,
-        one_time_keyboard=True,
-    )
+    await DB.close()
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=f"{match["players"][0]["name"]} {match["players"][0]["rank"]}",
+                callback_data=match["players"][0]["id"],
+            ),
+            InlineKeyboardButton(
+                text=f"{match["players"][1]["name"]} {match["players"][1]["rank"]}",
+                callback_data=match["players"][1]["id"],
+            ),
+        ]
+    ]
+    buttons.append([InlineKeyboardButton(text="Stop", callback_data="stop")])
+    keyboard = InlineKeyboardMarkup(buttons)
 
-    await update.message.reply_text(
-        "Choose the player you want to bet on", reply_markup=keyboard
-    )
+    game_text = f"Select the player you want to bet on.\nOdds: {match["odds"][0] * 100:.2f}% , {match["odds"][1] * 100:.2f}%\nCurrent Payout: {payout[0]} : {payout[1]}"
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(game_text, reply_markup=keyboard)
     return WINNER
 
 
 async def winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text == "Stop":
-        return ConversationHandler.END
-
-    context.user_data["winner"] = update.message.text
+    winner_id = update.callback_query.data
+    context.user_data["winner_id"] = winner_id
 
     await connect()
-    existing_bet = context.user_data.get("existing_bet")
-    if existing_bet:
-        await DB.query(
-            f"DELETE bets where in == gambler:{update.effective_user.id} and out=={context.user_data["match"]["id"]}"
-        )
-        await DB.query(
-            f"UPDATE gambler:{update.effective_user.id} set balance+={existing_bet["amount"]}"
-        )
-        await update.message.reply_text(f"ℹ️ Your existing bet refunded.")
-
     gambler = await DB.select(f"gambler:{update.effective_user.id}")
     await DB.close()
 
     context.user_data["gambler"] = gambler
 
-    await update.message.reply_text(
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
         f"Your Balance: {gambler["balance"]}.\nHow much do you want to bet?",
-        reply_markup=ReplyKeyboardRemove(),
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton(text="Stop", callback_data="stop")]]
+        ),
     )
     return AMOUNT
 
 
 async def set_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    match_id = context.user_data["match_id"]
     gambler = context.user_data["gambler"]
-    match = context.user_data["match"]
+    winner_id = context.user_data["winner_id"]
 
     bet_amount = update.message.text
 
     if not bet_amount.isdigit():
         await update.message.reply_text(
-            f"Please enter a number between 0 and {gambler["balance"]}"
+            f"🚨 Please enter a number between 0 and {gambler["balance"]}",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton(text="Stop", callback_data="stop")]]
+            ),
         )
         return AMOUNT
+
     bet_amount = int(bet_amount)
     if bet_amount <= 0 or bet_amount > gambler["balance"]:
         await update.message.reply_text(
-            f"Please enter a number between 0 and {gambler["balance"]}"
+            f"🚨 Please enter a number between 0 and {gambler["balance"]}",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton(text="Stop", callback_data="stop")]]
+            ),
         )
         return AMOUNT
 
-    winner = next(
-        player
-        for player in match["players"]
-        if player["name"] == context.user_data["winner"]
-    )
     await connect()
-
     await DB.query(
-        f"RELATE gambler:{update.effective_user.id}->bets->{match["id"]} SET amount={bet_amount},winner={winner["id"]}"
+        f"RELATE {gambler["id"]}->bets->{match_id} SET amount={bet_amount},winner={winner_id}"
     )
     await DB.query(
         f"UPDATE gambler:{update.effective_user.id} set balance-={bet_amount}"
     )
+    player = await DB.select(winner_id)
     await DB.close()
+
     await update.message.reply_text(
-        f"✅ Your bet as accepted. \n\nMatch: {match["id"].split(":")[-1]}\nPlayer: {winner["name"]}\nAmount: {bet_amount}"
+        f"✅ Your bet as accepted. \n\nMatch: {match_id.split(":")[-1]}\nPlayer: {player["name"]}\nAmount: {bet_amount}"
     )
+    return ConversationHandler.END
+
+
+async def stop_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("existing_bet"):
+        await update.message.reply_text(
+            f"ℹ️ You had placed a bet on this game, but since you attempted to create a new bet, your original bet was refunded. Please use /me to see your bets"
+        )
+
+    await update.message.reply_text("Bet was interrupted")
+    return ConversationHandler.END
+
+
+async def stop_bet_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("existing_bet"):
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"ℹ️ You had placed a bet on this game, but since you attempted to create a new bet, your original bet was refunded. Please use /me to see your bets",
+        )
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text("Bet was interrupted")
     return ConversationHandler.END
 
 
@@ -458,23 +506,26 @@ async def remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
-    context.user_data["bets"] = bets
-    keyboard = ReplyKeyboardMarkup(
+    buttons = [
         [
-            [
-                (
-                    f"({bet["players"][0]}) vs {bet["players"][1]} - {bet["amount"]}"
-                    if bet["winner"] == bet["players"][0]
-                    else f"{bet["players"][0]} vs ({bet["players"][1]}) - {bet["amount"]}"
-                ),
-            ]
-            for bet in bets
-        ],
-        one_time_keyboard=True,
-    )
+            (
+                InlineKeyboardButton(
+                    (
+                        f"({bet["players"][0]}) vs {bet["players"][1]} - {bet["amount"]}"
+                        if bet["winner"] == bet["players"][0]
+                        else f"{bet["players"][0]} vs ({bet["players"][1]}) - {bet["amount"]}"
+                    ),
+                    callback_data=bet["id"],
+                )
+            ),
+        ]
+        for bet in bets
+    ]
 
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
+    buttons.append([InlineKeyboardButton(text="Stop", callback_data="stop_remove")])
+    keyboard = InlineKeyboardMarkup(buttons)
+
+    await update.message.reply_text(
         text="Select the match you want to remove",
         reply_markup=keyboard,
     )
@@ -483,24 +534,23 @@ async def remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def display_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    remove_text = update.message.text.split(" -")[0]
-
-    player1_name, player2_name = re.sub(r"[()]", "", remove_text).split(" vs ")
-
-    bet = [
-        bet
-        for bet in context.user_data["bets"]
-        if all(player in [player1_name, player2_name] for player in bet["players"])
-    ][0]
-
+    bet_id = update.callback_query.data
     await connect()
+    bet = await DB.select(bet_id)
     gambler = await DB.select(f"gambler:{user_id}")
     await DB.query(f"UPDATE gambler:{user_id} set balance+={bet["amount"]}")
-    await DB.delete(f"{bet["id"]}")
+    await DB.delete(bet["id"])
     await DB.close()
-    await update.message.reply_text(
-        text=f"✅ Your bet for Match {bet["out"].split(":")[-1]} was removed and {bet["amount"]} where added back to your balance.\n\nYour new balance is {bet["balance"] + bet["amount"]}"
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        text=f"✅ Your bet for Match {bet["out"].split(":")[-1]} was removed and {bet["amount"]} where added back to your balance.\n\nYour new balance is {gambler["balance"] + bet["amount"]}"
     )
+    return ConversationHandler.END
+
+
+async def stop_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text("Remove bet was interrupted")
     return ConversationHandler.END
 
 
@@ -512,19 +562,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"{message}If you need assistance, use the /help command to access all relevant commands.",
+        text=f"{message}If you need assistance, use the /help csommand to access all relevant commands.",
     )
 
 
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"An error occurred. Please try again. The admin has been notified and will work to resolve the problem.",
+        text=f"🚨 An error occurred. Please try again. The admin has been notified and will work to resolve the problem.",
     )
-    await context.bot.send_message(
-        chat_id=str(ADMIN_ID),
-        text=f"{update.update_id}",
-    )
+
+    # await context.bot.send_message(
+    #     chat_id=ADMIN_ID,
+    #     text=f"🚨🚨🚨 An error happended in {update.update_id} for user {update.effective_user.id}",
+    # )
+    #  await add_message(update.effective_user.id, update.update_id, update)
 
 
 def is_admin(user_id: int) -> bool:
