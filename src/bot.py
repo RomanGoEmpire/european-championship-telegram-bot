@@ -2,9 +2,9 @@ import os
 import re
 import datetime
 
+from dotenv import load_dotenv
 import telegram
 from icecream import ic
-from dotenv import load_dotenv
 from surrealdb import Surreal
 from telegram import (
     Update,
@@ -26,14 +26,18 @@ from telegram.ext import (
 
 # - - - - - DB - - - - -
 
+load_dotenv()
 DB = Surreal("ws://localhost:8000/rpc")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
+USER = os.getenv("SURREAL_USER")
+PASSWORD = os.getenv("SURREAL_PASSWORD")
 
 
 async def connect():
+
     await DB.connect()
-    await DB.signin({"user": "root", "pass": "root"})
-    await DB.use("test", "test")
+    await DB.signin({"user": USER, "pass": PASSWORD})
+    await DB.use("main", "main")
 
 
 async def get_gambler(id: int):
@@ -75,7 +79,7 @@ async def get_payout(match_id):
         match = await DB.select(match_id)
         await DB.close()
         odds = match["odds"]
-        return (round(1 + odds[1] / odds[0], 1), round(1 + odds[0] / odds[1], 1))
+        return (round(1 + odds[1] / odds[0], 2), round(1 + odds[0] / odds[1], 2))
     await DB.close()
     players = bets[0]["players"]
     odds = bets[0]["odds"]
@@ -85,11 +89,11 @@ async def get_payout(match_id):
     ]
 
     if 0 in player_amounts:
-        return (round(1 + odds[1] / odds[0], 1), round(1 + odds[0] / odds[1], 1))
+        return (round(1 + odds[1] / odds[0], 2), round(1 + odds[0] / odds[1], 2))
     else:
         return (
-            round(1 + player_amounts[1] / player_amounts[0], 1),
-            round(1 + player_amounts[0] / player_amounts[1], 1),
+            round(1 + player_amounts[1] / player_amounts[0], 2),
+            round(1 + player_amounts[0] / player_amounts[1], 2),
         )
 
 
@@ -98,6 +102,7 @@ async def get_payout(match_id):
 GAME, WINNER, AMOUNT = range(3)
 REMOVE_BET = range(1)
 CHANGE_NAME = range(1)
+ADMIN_GAME, ADMIN_WINNER = range(2)
 
 START_TEXT = """
 Get ready to place your bets and follow the exciting battles of the European Go Championship!
@@ -109,7 +114,7 @@ Get ready to place your bets and follow the exciting battles of the European Go 
 
 🏆 The best participants will receive a prize after the finals.
 
-❗ To change the name that will be displayed on the leaderboard, use the command /setname name.
+❗ To change the name that will be displayed on the leaderboard, use the command /changename name.
 
 ℹ️ To learn more about the available commands and features, start by typing /help.
 
@@ -149,15 +154,36 @@ Balance: {balance}
 INFO_TEXT = """
 🎲 *Match Information for {round_name}*
 
-*🥊 Matches*
 {matches}
 
 {time_left}
 """
 
+CORRECT_GUESS = """
+🎉 Your guess for Match {match_id} was correct!
+
+{players}
+Winner: {winner}
+Payouts: {payouts}
+Your bet was: {bet_amount} on {guessed_winner}
+
+You won {amount} and your balance is now {balance}!
+"""
+
+WRONG_GUESS = """
+😞 Your guess for Match {match_id} was incorrect.
+
+{players}
+Winner: {winner}
+Payouts: {payouts}
+Your bet was: {bet_amount} on {guessed_winner}
+
+You lost {bet_amount} and your balance is now {balance}.
+"""
+
 
 def init_bot():
-    load_dotenv()
+
     TOKEN = os.getenv("TOKEN")
     assert TOKEN and TOKEN != "", "Token missing"
 
@@ -179,16 +205,35 @@ def init_bot():
             MessageHandler(filters.TEXT | filters.COMMAND, stop_bet),
         ],
         name="bet_handler",
-        per_user=False,
     )
     remove_handler = ConversationHandler(
         entry_points=[CommandHandler("remove", remove)],
         states={REMOVE_BET: [CallbackQueryHandler(display_remove, pattern="^bets")]},
-        fallbacks=[CallbackQueryHandler(stop_remove, pattern="^stop_remove")],
+        fallbacks=[
+            CallbackQueryHandler(stop_remove_button, pattern="^stop_remove"),
+            MessageHandler(filters.TEXT | filters.COMMAND, stop_remove),
+        ],
         name="bet_handler",
     )
+    admin_hanlder = ConversationHandler(
+        entry_points=[CommandHandler("winner", admin_set_winner)],
+        states={
+            ADMIN_GAME: [
+                CallbackQueryHandler(admin_game, pattern="^match"),
+            ],
+            ADMIN_WINNER: [
+                CallbackQueryHandler(admin_winner, pattern="^player"),
+            ],
+        },
+        fallbacks=[
+            CallbackQueryHandler(stop_admin_button, pattern="^stop"),
+        ],
+        name="admin_handler",
+    )
+
     application.add_handler(bet_handler)
     application.add_handler(remove_handler)
+    application.add_handler(admin_hanlder)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help))
     application.add_handler(CommandHandler("me", me))
@@ -196,8 +241,10 @@ def init_bot():
     application.add_handler(CommandHandler("leaderboard", leaderboard))
     application.add_handler(CommandHandler("info", info))
 
+    # admin commands
+
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
-    application.add_error_handler(error)
+    # application.add_error_handler(error)
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
@@ -228,7 +275,7 @@ async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await connect()
     active_bets = await DB.query(
-        f"SELECT *,winner.name as winner,out<-plays<-player.* as players,out.winner as actual_winner FROM bets where in=={gambler["id"]}"
+        f"SELECT *,winner.name as winner,out<-plays<-player.* as players,out.winner as actual_winner FROM bets where in=={gambler["id"]} and actual_winner is None"
     )
     active_bets = active_bets[0]["result"]
     active_bets_text = "\n".join(
@@ -334,7 +381,7 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await connect()
     matches = await DB.query(
-        f"SELECT *,round.*,<-plays.in.* as players FROM match where round.active"
+        f"SELECT *,round.*,<-plays.in.* as players FROM match where round.active and round.deadline > time::now()"
     )
     matches = matches[0]["result"]
 
@@ -536,21 +583,179 @@ async def display_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     bet_id = update.callback_query.data
     await connect()
-    bet = await DB.select(bet_id)
-    gambler = await DB.select(f"gambler:{user_id}")
+    bet: dict = await DB.select(bet_id)
+    gambler: dict = await DB.select(f"gambler:{user_id}")
     await DB.query(f"UPDATE gambler:{user_id} set balance+={bet["amount"]}")
     await DB.delete(bet["id"])
     await DB.close()
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(
-        text=f"✅ Your bet for Match {bet["out"].split(":")[-1]} was removed and {bet["amount"]} where added back to your balance.\n\nYour new balance is {gambler["balance"] + bet["amount"]}"
+        text=f"✅ Your bet for Match {bet["out"].split(":")[-1]} was removed and {bet["amount"]} where added back to your balance.\nYour new balance is {gambler["balance"] + bet["amount"]}."
     )
     return ConversationHandler.END
 
 
 async def stop_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Remove bet was interrupted")
+    return ConversationHandler.END
+
+
+async def stop_remove_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
     await update.callback_query.edit_message_text("Remove bet was interrupted")
+    return ConversationHandler.END
+
+
+async def admin_set_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+
+    await connect()
+    matches = await DB.query(
+        f"SELECT *,round.*,<-plays.in.* as players FROM match where round.active and winner is None"
+    )
+    matches = matches[0]["result"]
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=f"{match["players"][0]["name"]} vs {match["players"][1]["name"]}",
+                callback_data=match["id"],
+            )
+        ]
+        for match in matches
+    ]
+    buttons.append([InlineKeyboardButton(text="Stop", callback_data="stop")])
+    keyboard = InlineKeyboardMarkup(buttons)
+
+    await update.message.reply_text("Which game finished", reply_markup=keyboard)
+    return ADMIN_GAME
+
+
+async def admin_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    match_id = update.callback_query.data
+
+    await connect()
+    match = await DB.query(f"SELECT *,round.*,<-plays.in.* as players FROM {match_id}")
+    await DB.close()
+
+    match = match[0]["result"][0]
+    context.user_data["admin_match"] = match
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=f"{match["players"][0]["name"]} {match["players"][0]["rank"]}",
+                callback_data=match["players"][0]["id"],
+            ),
+            InlineKeyboardButton(
+                text=f"{match["players"][1]["name"]} {match["players"][1]["rank"]}",
+                callback_data=match["players"][1]["id"],
+            ),
+        ],
+        [InlineKeyboardButton(text="Stop", callback_data="stop")],
+    ]
+    keyboard = InlineKeyboardMarkup(buttons)
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        "Select Winner", reply_markup=keyboard
+    )
+    return ADMIN_WINNER
+
+
+async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    winner_id = update.callback_query.data
+    match = context.user_data["admin_match"]
+    del context.user_data["admin_match"]
+
+    looser_id = (
+        match["players"][0]["id"]
+        if match["players"][0]["id"] != winner_id
+        else match["players"][1]["id"]
+    )
+    await connect()
+    winner: dict = await DB.select(winner_id)
+    looser: dict = await DB.select(looser_id)
+
+    await DB.query(f"UPDATE {match["id"]} SET winner={winner_id},looser={looser_id}")
+    if match.get("next_match_for_winner"):
+        await DB.query(f"RELATE {winner_id}->plays->{match["next_match_for_winner"]}")
+    if match.get("next_match_for_looser"):
+        await DB.query(f"RELATE {looser_id}->plays->{match["next_match_for_looser"]}")
+
+    # get all bets
+    bets = await DB.query(
+        f"SELECT *,in.* as gambler FROM bets WHERE out=={match["id"]}"
+    )
+    bets = bets[0]["result"]
+    winner_amount, looser_amount = (
+        sum(bet["amount"] for bet in bets if bet["winner"] == winner_id),
+        sum(bet["amount"] for bet in bets if bet["winner"] == looser_id),
+    )
+
+    payouts = await get_payout(match["id"])
+    index_payout = next(
+        (i for i, player in enumerate(match["players"]) if player["id"] == winner_id),
+        -1,
+    )
+    assert index_payout != -1, " index is -1 "
+    payout = payouts[index_payout]
+
+    await connect()
+    for bet in bets:
+        if bet["winner"] == winner_id:
+            message = CORRECT_GUESS
+
+            amount_difference = bet["amount"] * payout
+            await DB.query(f"UPDATE {bet["in"]} SET balance+={amount_difference}")
+
+        else:
+            message = WRONG_GUESS
+            amount_difference = bet["amount"]
+
+        gambler: dict = await DB.select(bet["in"])
+        await context.bot.send_message(
+            chat_id=bet["gambler"]["chat_id"],
+            text=message.format(
+                match_id=match["id"].split(":")[-1],
+                players=f"{match["players"][0]["name"]} {match["players"][0]["rank"]} vs {match["players"][1]["name"]} {match["players"][1]["rank"]}",
+                winner=winner["name"],
+                payouts=f"{payouts[0]} : {payouts[1]}",
+                bet_amount=bet["amount"],
+                guessed_winner=winner["name"],
+                amount=amount_difference,
+                balance=gambler["balance"],
+            ),
+        )
+
+    ongoing_matches = await DB.query(
+        "select *,round.* from match where round.active and winner is None"
+    )
+    ongoing_matches = ongoing_matches[0]["result"]
+
+    if ongoing_matches:
+        active_round = await DB.query("select * from round where active")
+        active_round = active_round[0]["result"][0]
+
+        await DB.query(f"UPDATE {active_round["id"]} set active=False")
+        await DB.query(
+            f"UPDATE round:{int(active_round["id"].split(":")[-1]) + 1} set active=True"
+        )
+
+        gamblers = await DB.select("gambler")
+        for gambler in gamblers:
+            await context.bot.send_message(
+                chat_id=gambler["chat_id"],
+                text=f"🌟 {active_round["name"]} has ended!\n\nThe bets are now open for the next round. Use the /bet command to start placing bets, or check your new Balance with the /me command. Good luck to everyone!",
+            )
+
+    await DB.close()
+
+
+async def stop_admin_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text("Stopped selection of winner")
     return ConversationHandler.END
 
 
@@ -572,19 +777,15 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=f"🚨 An error occurred. Please try again. The admin has been notified and will work to resolve the problem.",
     )
 
-    # await context.bot.send_message(
-    #     chat_id=ADMIN_ID,
-    #     text=f"🚨🚨🚨 An error happended in {update.update_id} for user {update.effective_user.id}",
-    # )
-    #  await add_message(update.effective_user.id, update.update_id, update)
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=f"🚨🚨🚨 An error happended in {update.update_id} for user {update.effective_user.id}",
+    )
+    await add_message(update.effective_user.id, update.update_id, update)
 
 
 def is_admin(user_id: int) -> bool:
     return ADMIN_ID == user_id
-
-
-def valid_match_id(match_id: int) -> bool:
-    return match_id > 0 and match_id <= 60
 
 
 def convert_string_to_datetime(date_string) -> datetime.datetime:
