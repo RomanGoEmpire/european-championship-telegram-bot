@@ -68,19 +68,6 @@ async def get_gambler(id: int):
     return gambler
 
 
-async def add_message(user_id: int, update_id: int, update: Update):
-    await connect()
-    await DB.create(
-        "message",
-        data={
-            "gambler": f"gambler:{user_id}",
-            "chat_id": update_id,
-            "data": str(update),
-        },
-    )
-    await DB.close()
-
-
 async def get_active_matches() -> list:
     await connect()
     active_games = await DB.query(
@@ -775,7 +762,6 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=ADMIN_ID,
         text=message,
     )
-    await add_message(update.effective_user.id, update.update_id, update)
 
 
 # - - - - - Utils - - - - -
