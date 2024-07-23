@@ -328,6 +328,9 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     matches = matches[0]["result"]
 
+    if not matches:
+        await update.message.reply_text("🎲 There are no bets open at the moment.")
+
     buttons = [
         [
             InlineKeyboardButton(
@@ -707,7 +710,8 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         for gambler in gamblers:
-            await DB.query(f"UPDATE {gambler["id"]} SET balance+=50")
+            if active_round["id"] != "round:8":
+                await DB.query(f"UPDATE {gambler["id"]} SET balance+=50")
             await context.bot.send_message(
                 chat_id=gambler["chat_id"], text=end_of_round_text
             )
@@ -747,6 +751,9 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=f"🚨🚨🚨 An error happended in {update.update_id} for user {update.effective_user.id}",
     )
     await add_message(update.effective_user.id, update.update_id, update)
+
+
+# - - - - - Utils - - - - -
 
 
 def is_admin(user_id: int) -> bool:
