@@ -218,7 +218,7 @@ async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await connect()
     active_bets = await DB.query(
-        f"SELECT *,winner.name as winner,out<-plays<-player.* as players,out.winner as actual_winner FROM bets where in=={gambler["id"]} and actual_winner is None"
+        f"SELECT *,winner.name as winner,out<-plays<-player.* as players FROM bets where in=={gambler["id"]} and out.winner is None"
     )
     active_bets = active_bets[0]["result"]
     active_bets_text = "\n".join(
