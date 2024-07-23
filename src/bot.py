@@ -642,6 +642,8 @@ async def admin_set_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def admin_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
     match_id = update.callback_query.data
 
     await connect()
@@ -674,6 +676,8 @@ async def admin_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
     winner_id = update.callback_query.data
     match = context.user_data["admin_match"]
     del context.user_data["admin_match"]
@@ -789,6 +793,8 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     await DB.close()
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text("✅ Winner selected")
 
 
 async def stop_admin_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
