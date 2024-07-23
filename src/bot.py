@@ -24,6 +24,13 @@ from telegram.ext import (
 )
 from .formulars import win_percentages
 
+from warnings import filterwarnings
+from telegram.warnings import PTBUserWarning
+
+filterwarnings(
+    action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning
+)
+
 
 # - - - - - DB - - - - -
 
@@ -244,7 +251,7 @@ def init_bot():
     application.add_handler(CommandHandler("info", info))
 
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
-    application.add_error_handler(error)
+    # application.add_error_handler(error)
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
@@ -254,7 +261,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gambler = await get_gambler(id)
     if not gambler:
         await connect()
-        username = update.effective_user.username
+        username = update.effective_user.full_name
+        if username is None:
+            username = "unknown user"
         chat_id = update.message.chat_id
 
         await DB.create(
