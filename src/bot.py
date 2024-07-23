@@ -171,7 +171,7 @@ INFO_TEXT = """
 CORRECT_GUESS = """
 🎉 Your guess for Match {match_id} was correct!
 
-{players}
+Game: {players}
 Winner: {winner}
 Payouts: {payouts}
 Your bet was: {bet_amount} on {guessed_winner}
@@ -182,7 +182,7 @@ You won {amount} and your balance is now {balance}!
 WRONG_GUESS = """
 😞 Your guess for Match {match_id} was incorrect.
 
-{players}
+Game:  {players}
 Winner: {winner}
 Payouts: {payouts}
 Your bet was: {bet_amount} on {guessed_winner}
