@@ -23,6 +23,16 @@ from telegram.ext import (
     ConversationHandler,
 )
 from .formulars import win_percentages
+from .messages import (
+    START_TEXT,
+    HELP_TEXT,
+    ME_TEXT,
+    INFO_TEXT,
+    EXISTING_BET_TEXT,
+    CORRECT_GUESS,
+    WRONG_GUESS,
+    TOURNAMENT_END_TEXT,
+)
 
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
@@ -111,84 +121,6 @@ GAME, WINNER, AMOUNT = range(3)
 REMOVE_BET = range(1)
 CHANGE_NAME = range(1)
 ADMIN_GAME, ADMIN_WINNER = range(2)
-
-START_TEXT = """
-Get ready to place your bets and follow the exciting battles of the European Go Championship!
-
-*Format*
-- Each player starts with 1,000 points.
-- After each round each player will receive 50 points.
-- Place your bets on players with /bet.
-- Player that guessed the winners will receive a payout. Check out /me to see your balance and bets.
-
-🏆 The best participants will receive a prize after the finals.
-
-❗ To change the name that will be displayed on the leaderboard, use the command /changename name.
-
-ℹ️ To learn more about the available commands and features, start by typing /help.
-
-Let's get started! 🚀
-"""
-
-HELP_TEXT = """
-💬 *Change Name*
-/changename _newname_ - Change your Name (Default is your Telegram name)
-
-🔍 *Account Information*
-/me - View your name,current balance, active bets and betting history
-
-🏆 *Leaderboard*
-/leaderboard - View the current leaderboard of all players
-
-🎲 *Match Information*
-/info - Retrieve detailed information about the matches
-
-🎯 *Place a Bet*
-/bet - Place a bet
-
-❌ *Remove a Bet*
-/remove - Remove a bet
-"""
-
-ME_TEXT = """
-🔍 *Profile*
-
-Name: {name}
-Balance: {balance}
-
-*Active bets:*
-{active_bets}
-"""
-
-INFO_TEXT = """
-🎲 *Match Information for {round_name}*
-
-{matches}
-
-{time_left}
-"""
-
-CORRECT_GUESS = """
-🎉 Your guess for Match {match_id} was correct!
-
-Game: {players}
-Winner: {winner}
-Payouts: {payouts}
-Your bet was: {bet_amount} on {guessed_winner}
-
-You won {amount} and your balance is now {balance}!
-"""
-
-WRONG_GUESS = """
-😞 Your guess for Match {match_id} was incorrect.
-
-Game:  {players}
-Winner: {winner}
-Payouts: {payouts}
-Your bet was: {bet_amount} on {guessed_winner}
-
-You lost {bet_amount} and your balance is now {balance}.
-"""
 
 
 def init_bot():
@@ -521,9 +453,7 @@ async def set_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stop_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("existing_bet"):
-        await update.message.reply_text(
-            f"ℹ️ You had placed a bet on this game, but since you attempted to create a new bet, your original bet was refunded. Please use /me to see your bets"
-        )
+        await update.message.reply_text(EXISTING_BET_TEXT)
 
     await update.message.reply_text("Bet was interrupted")
     return ConversationHandler.END
@@ -531,10 +461,7 @@ async def stop_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stop_bet_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("existing_bet"):
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"ℹ️ You had placed a bet on this game, but since you attempted to create a new bet, your original bet was refunded. Please use /me to see your bets",
-        )
+        await update.message.reply_text(EXISTING_BET_TEXT)
     await update.callback_query.answer()
     await update.callback_query.edit_message_text("Bet was interrupted")
     return ConversationHandler.END
@@ -775,18 +702,9 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             champion = await DB.query("SELECT *,winner.* as winner FROM match:59")
             champion = champion[0]["result"][0]
-            end_of_round_text = f"""
-            🌟 The European Championship 2024 has concluded!
-
-            After eight thrilling days of competition, we bid farewell to this year's European Go Championship.
-            We extend our gratitude to all the participants for their involvement in this exhilarating event.
-
-            Congratulations to our champion, {champion["winner"]["name"]}, who emerged victorious in the final match!
-
-            🏆 Please check out /leaderboard to see your final placement.
-
-            We hope you enjoyed this exciting competition. Have a wonderful second week of EGC!
-            """
+            end_of_round_text = TOURNAMENT_END_TEXT.format(
+                champion=champion["winner"]["name"]
+            )
 
         for gambler in gamblers:
             await DB.query(f"UPDATE {gambler["id"]} SET balance+=50")
