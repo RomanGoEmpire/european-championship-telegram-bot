@@ -290,6 +290,9 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return f"{hours}:{minutes}:{seconds}"
 
     active_matches = await get_active_matches()
+    if not active_matches:
+        await update.message.reply_text("There are no matches to get info for")
+        return
     round_name = active_matches[0]["round"]["name"]
     deadline = convert_string_to_datetime(active_matches[0]["round"]["deadline"])
     payouts = [await get_payout(match["id"]) for match in active_matches]
