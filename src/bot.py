@@ -186,7 +186,7 @@ def init_bot():
     application.add_handler(CommandHandler("info", info))
 
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
-    # application.add_error_handler(error)
+    application.add_error_handler(error)
 
     ic("Bot started")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
