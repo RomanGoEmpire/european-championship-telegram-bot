@@ -252,6 +252,8 @@ def init_bot():
 
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
     application.add_error_handler(error)
+
+    ic("Bot started")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
@@ -795,6 +797,7 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await DB.close()
     await update.callback_query.answer()
     await update.callback_query.edit_message_text("✅ Winner selected")
+    return ConversationHandler.END
 
 
 async def stop_admin_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
