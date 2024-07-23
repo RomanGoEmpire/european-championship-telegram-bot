@@ -749,7 +749,7 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ongoing_matches = ongoing_matches[0]["result"]
 
     if not ongoing_matches:
-        await connect()
+
         active_round = await DB.query("select * from round where active")
         active_round = active_round[0]["result"][0]
 
@@ -788,7 +788,6 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
             We hope you enjoyed this exciting competition. Have a wonderful second week of EGC!
             """
 
-        await connect()
         for gambler in gamblers:
             await DB.query(f"UPDATE {gambler["id"]} SET balance+=50")
             await context.bot.send_message(
@@ -841,7 +840,6 @@ def convert_string_to_datetime(date_string) -> datetime.datetime:
 
 
 async def add_odds() -> None:
-    await connect()
     matches = await DB.query(
         "select *,<-plays<-player.elo as elo, <-plays<-player.name as name from match where round.active"
     )
@@ -851,4 +849,3 @@ async def add_odds() -> None:
         r1, r2 = match["elo"]
         p1, p2 = win_percentages(r1, r2)
         await DB.query(f"UPDATE {match["id"]} set odds={[p1,p2]}")
-    await DB.close()
