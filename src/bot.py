@@ -330,7 +330,7 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not matches:
         await update.message.reply_text("🎲 There are no bets open at the moment.")
-        return ConversationHandler.End
+        return ConversationHandler.END
 
     buttons = [
         [
