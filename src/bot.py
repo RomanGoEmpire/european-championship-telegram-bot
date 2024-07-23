@@ -701,12 +701,12 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # get all bets
     bets = await DB.query(
-        f"SELECT *,in.* as gambler FROM bets WHERE out=={match["id"]}"
+        f"SELECT *,in.* as gambler,winner.* as winner FROM bets WHERE out=={match["id"]}"
     )
     bets = bets[0]["result"]
     winner_amount, looser_amount = (
-        sum(bet["amount"] for bet in bets if bet["winner"] == winner_id),
-        sum(bet["amount"] for bet in bets if bet["winner"] == looser_id),
+        sum(bet["amount"] for bet in bets if bet["winner"]["id"] == winner_id),
+        sum(bet["amount"] for bet in bets if bet["winner"]["id"] == looser_id),
     )
 
     payouts = await get_payout(match["id"])
@@ -719,7 +719,7 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await connect()
     for bet in bets:
-        if bet["winner"] == winner_id:
+        if bet["winner"]["id"] == winner_id:
             message = CORRECT_GUESS
             amount_difference = round(bet["amount"] * payout)
             await DB.query(f"UPDATE {bet["in"]} SET balance+={amount_difference}")
@@ -737,7 +737,7 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 winner=winner["name"],
                 payouts=f"{payouts[0]} : {payouts[1]}",
                 bet_amount=bet["amount"],
-                guessed_winner=winner["name"],
+                guessed_winner=bet["winner"]["name"],
                 amount=amount_difference,
                 balance=gambler["balance"],
             ),
