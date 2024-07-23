@@ -16,6 +16,7 @@ from telegram import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from telegram.constants import ParseMode
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -208,11 +209,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data={"name": username, "username": username, "chat_id": chat_id},
         )
         await DB.close()
-    await update.message.reply_text(START_TEXT, parse_mode="markdown")
+    await update.message.reply_text(START_TEXT, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(HELP_TEXT, parse_mode="markdown")
+    await update.message.reply_text(HELP_TEXT, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -236,7 +237,7 @@ async def me(update: Update, context: ContextTypes.DEFAULT_TYPE):
             balance=gambler["balance"],
             active_bets=active_bets_text,
         ),
-        parse_mode="markdown",
+        parse_mode=ParseMode.MARKDOWN_V2,
     )
 
 
@@ -245,7 +246,7 @@ async def changename(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="❌ Please provide a name.\nExample: /changename NewName",
-            parse_mode="markdown",
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
         return
 
@@ -256,7 +257,7 @@ async def changename(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=f"✅ Your name was updated to '{name}'",
-        parse_mode="markdown",
+        parse_mode=ParseMode.MARKDOWN_V2,
     )
 
 
@@ -281,7 +282,7 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             leaderboard_text += f"{index + 1}: "
         leaderboard_text += f"{gambler["name"]} - {gambler["balance"]}\n"
     leaderboard_text += f"\n\nYou are *{leaderboard_position}.* with *{gamblers[leaderboard_position -1]["balance"]}* points"
-    await update.message.reply_text(leaderboard_text, parse_mode="markdown")
+    await update.message.reply_text(leaderboard_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -323,7 +324,7 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         INFO_TEXT.format(
             round_name=round_name, matches=matches, time_left=time_left_text
         ),
-        parse_mode="markdown",
+        parse_mode=ParseMode.MARKDOWN_V2,
     )
 
 
@@ -769,6 +770,7 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=f"🚨 An error occurred. Please try again. The admin has been notified and will work to resolve the problem.",
+        parse_mode=ParseMode.HTML,
     )
 
     await context.bot.send_message(
