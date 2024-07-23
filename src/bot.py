@@ -718,7 +718,6 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payout = payouts[index_payout]
 
     await connect()
-
     for bet in bets:
         if bet["winner"] == winner_id:
             message = CORRECT_GUESS
@@ -749,6 +748,7 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     ongoing_matches = ongoing_matches[0]["result"]
 
+    await connect()
     if not ongoing_matches:
         active_round = await DB.query("select * from round where active")
         active_round = active_round[0]["result"][0]
@@ -788,6 +788,7 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
             We hope you enjoyed this exciting competition. Have a wonderful second week of EGC!
             """
 
+        await connect()
         for gambler in gamblers:
             await DB.query(f"UPDATE {gambler["id"]} SET balance+=50")
             await context.bot.send_message(
