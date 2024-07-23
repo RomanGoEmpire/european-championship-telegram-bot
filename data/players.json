@@ -30,14 +30,14 @@
   {
     "elo": 2718,
     "id": "player:stanislaw_frejlak",
-    "name": "Stanislaw Frejlak",
+    "name": "Stanisław Frejlak",
     "rank": "1p",
     "starting_number": 5
   },
   {
     "elo": 2702,
     "id": "player:lukas_podpera",
-    "name": "Lukas Podpera",
+    "name": "Lukáš Podpěra",
     "rank": "7d",
     "starting_number": 6
   },
@@ -51,7 +51,7 @@
   {
     "elo": 2687,
     "id": "player:benjamin_drean_guenaizia",
-    "name": "Benjamin Drean-Guenaizia",
+    "name": "Benjamin Dréan-Guénaïzia",
     "rank": "7d",
     "starting_number": 8
   },
@@ -72,7 +72,7 @@
   {
     "elo": 2670,
     "id": "player:tanguy_lecalve",
-    "name": "Tanguy LeCalve",
+    "name": "Tanguy Le Calvé",
     "rank": "1p",
     "starting_number": 11
   },
@@ -107,7 +107,7 @@
   {
     "elo": 2605,
     "id": "player:lukas_kraemer",
-    "name": "Lukas Kraemer",
+    "name": "Lukas Krämer",
     "rank": "6d",
     "starting_number": 16
   },
