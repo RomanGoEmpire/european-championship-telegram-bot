@@ -748,8 +748,8 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     ongoing_matches = ongoing_matches[0]["result"]
 
-    await connect()
     if not ongoing_matches:
+        await connect()
         active_round = await DB.query("select * from round where active")
         active_round = active_round[0]["result"][0]
 
@@ -773,15 +773,15 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
             Good luck to everyone in the next round!
             """
         else:
-            winner = await DB.query("SELECT *,winner.* as winner FROM match:59")
-            winner = winner[0]["result"][0]
+            champion = await DB.query("SELECT *,winner.* as winner FROM match:59")
+            champion = champion[0]["result"][0]
             end_of_round_text = f"""
             🌟 The European Championship 2024 has concluded!
 
             After eight thrilling days of competition, we bid farewell to this year's European Go Championship.
             We extend our gratitude to all the participants for their involvement in this exhilarating event.
 
-            Congratulations to our champion, {winner["winner"]["name"]}, who emerged victorious in the final match!
+            Congratulations to our champion, {champion["winner"]["name"]}, who emerged victorious in the final match!
 
             🏆 Please check out /leaderboard to see your final placement.
 
