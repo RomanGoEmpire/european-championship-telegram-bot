@@ -1,6 +1,5 @@
 import os
 import re
-import html
 import json
 import datetime
 import traceback
@@ -758,6 +757,9 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Build the message with some markup and additional information about what happened.
     # You might need to add some logic to deal with messages longer than the 4096 character limit.
     update_str = update.to_dict() if isinstance(update, Update) else str(update)
+
+    tb_string = re.sub(r"([_`\*\[\]()~>#+\-=|{}.!])", r"\\\1", tb_string)
+
     message = (
         "An exception was raised while handling an update\n"
         f"update = {json.dumps(update_str, indent=2, ensure_ascii=False)}\n\n"
