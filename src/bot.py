@@ -760,7 +760,7 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"🚨 An error occurred. Please try again. The admin has been notified and will work to resolve the problem.",
+        text=f"🚨 An error occurred. The admin has been notified and will work to resolve the problem.",
     )
 
     await context.bot.send_message(
