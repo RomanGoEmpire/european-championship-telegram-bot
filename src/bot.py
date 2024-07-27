@@ -48,7 +48,7 @@ filterwarnings(
 # - - - - - DB - - - - -
 
 load_dotenv()
-DB = Surreal("ws://localhost:8000/rpc")
+DB = Surreal(os.getenv("SURREAL_URL"))  # TODO make it a
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 USER = os.getenv("SURREAL_USER")
 PASSWORD = os.getenv("SURREAL_PASSWORD")
@@ -458,10 +458,12 @@ async def stop_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stop_bet_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("existing_bet"):
+    existing_bet = context.user_data.get("existing_bet")
+    if existing_bet:
         del context.user_data["existing_bet"]
-        await update.callback_query.answer()
-        await update.callback_query.edit_message_text(EXISTING_BET_TEXT)
+        await context.bot.send_message(
+            chat_id=existing_bet[0]["in"].split(":")[-1], text=EXISTING_BET_TEXT
+        )
     await update.callback_query.answer()
     await update.callback_query.edit_message_text("Bet was interrupted")
     return ConversationHandler.END
