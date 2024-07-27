@@ -450,6 +450,7 @@ async def set_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stop_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("existing_bet"):
+        del context.user_data["existing_bet"]
         await update.message.reply_text(EXISTING_BET_TEXT)
 
     await update.message.reply_text("Bet was interrupted")
@@ -458,6 +459,7 @@ async def stop_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stop_bet_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("existing_bet"):
+        del context.user_data["existing_bet"]
         await update.message.reply_text(EXISTING_BET_TEXT)
     await update.callback_query.answer()
     await update.callback_query.edit_message_text("Bet was interrupted")
