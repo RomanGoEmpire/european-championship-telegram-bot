@@ -48,6 +48,7 @@ filterwarnings(
 # - - - - - DB - - - - -
 
 load_dotenv()
+
 DB = Surreal(os.getenv("SURREAL_URL"))  # TODO make it a
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 USER = os.getenv("SURREAL_USER")
@@ -249,26 +250,67 @@ async def changename(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await connect()
+    # get all active bets and sum them per player
+    bets = await DB.query("SELECT * FROM bets WHERE out.winner == NONE")
+    bets = bets[0]["result"]
+    summed_bets = {}
+    for d in bets:
+        if d["in"] in summed_bets:
+            summed_bets[d["in"]] += d["amount"]
+        else:
+            summed_bets[d["in"]] = d["amount"]
+
     gamblers = await DB.select("gambler")
-    gamblers.sort(key=lambda gambler: gambler["balance"], reverse=True)
+    gamblers.sort(
+        key=lambda gambler: (
+            -gambler["balance"] - summed_bets.get(gambler["id"], 0),
+            gambler["name"],
+        ),
+    )
+
     await DB.close()
 
-    leaderboard_text = "🏆 *Leaderboard*\n\n"
-    leaderboard_position = 0
+    leaderboard_text = " <b>🏆 Leaderboard</b>\n"
+    max_name_length = max(len(gambler["name"]) for gambler in gamblers)
+    max_balance_length = max(len(str(gambler["balance"])) for gambler in gamblers)
+    max_bets_length = max(
+        len(str(summed_bets.get(gambler["id"], 0))) for gambler in gamblers
+    )
+    leaderboard_table = []
+
+    gambler_position = 0
+    gambler_id = None
     for index, gambler in enumerate(gamblers):
         if gambler["id"] == f"gambler:{update.effective_user.id}":
-            leaderboard_position = index + 1
-        if index == 0:
-            leaderboard_text += "🥇 "
-        elif index == 1:
-            leaderboard_text += "🥈 "
-        elif index == 2:
-            leaderboard_text += "🥉 "
-        else:
-            leaderboard_text += f"{index + 1}: "
-        leaderboard_text += f"{gambler["name"]} - {gambler["balance"]}\n"
-    leaderboard_text += f"\n\nYou are *{leaderboard_position}.* with *{gamblers[leaderboard_position -1]["balance"]}* points"
-    await update.message.reply_text(leaderboard_text, parse_mode="markdown")
+            gambler_position = index + 1
+            gambler_id = gambler["id"]
+        row = []
+        row.append(f"{index + 1}".ljust(5))
+        row.append(gambler["name"].ljust(max_name_length))
+        row.append(str(gambler["balance"]).rjust(8))
+        row.append(str(summed_bets.get(gambler["id"], 0)).rjust(max_bets_length))
+        row.append(str(gambler["balance"] + summed_bets.get(gambler["id"], 0)).rjust(8))
+        leaderboard_table.append(row)
+
+    table_header = "{}".format(
+        "\t".join(
+            [
+                "Place",
+                "Name".ljust(max_name_length),
+                "Balance".rjust(8),
+                "Bets".rjust(max_bets_length),
+                "Total".rjust(8),
+            ]
+        )
+    )
+    table_body = ""
+    for row in leaderboard_table:
+        table_body += "{}\n".format("\t".join([str(cell) for cell in row]))
+
+    leaderboard_text += f"<pre>{table_header}\n{table_body}</pre>"
+    leaderboard_text += f"\n\nYou are {gambler_position}. with {leaderboard_table[gambler_position - 1][-1].strip()} points"
+
+    await update.message.reply_text(leaderboard_text, parse_mode="HTML")
 
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
