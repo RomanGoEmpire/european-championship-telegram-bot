@@ -396,12 +396,12 @@ async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     match_id = update.callback_query.data
     context.user_data["match_id"] = match_id
 
+    await connect()
     existing_bet = await DB.query(
         f"SELECT *,winner.name as winner from bets where in == gambler:{update.effective_user.id} and out=={match_id}"
     )
     existing_bet = existing_bet[0]["result"]
 
-    await connect()
     if existing_bet:
         await DB.delete(existing_bet[0]["id"])
         await DB.query(
