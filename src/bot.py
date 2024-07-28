@@ -1,3 +1,4 @@
+from ast import Expression
 import os
 import re
 import json
@@ -759,9 +760,16 @@ async def admin_winner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for gambler in gamblers:
             if active_round["id"] != "round:8":
                 await DB.query(f"UPDATE {gambler["id"]} SET balance+=50")
-            await context.bot.send_message(
-                chat_id=gambler["chat_id"], text=end_of_round_text
-            )
+
+            if not gambler["active"]:
+                continue
+            try:
+                await context.bot.send_message(
+                    chat_id=gambler["chat_id"], text=end_of_round_text
+                )
+            except Exception as e:
+                await DB.query(f"UPDATE {gambler["id"]} set active=False")
+                pass
 
     await DB.close()
     await update.callback_query.answer()
