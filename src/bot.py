@@ -359,9 +359,15 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await connect()
     matches = await DB.query(
-        f"SELECT *,round.*,<-plays.in.* as players FROM match where round.active and round.deadline > time::now()"
+        f"SELECT *,round.*,<-plays.in.* as players FROM match where round.active"
     )
     matches = matches[0]["result"]
+    matches = [
+        match
+        for match in matches
+        if datetime.datetime.strptime(match["round"]["deadline"], "%Y-%m-%dT%H:%M:%SZ")
+        > datetime.datetime.now()
+    ]
 
     if not matches:
         await update.message.reply_text("🎲 There are no bets open at the moment.")
